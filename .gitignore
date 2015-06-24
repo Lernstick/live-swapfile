@@ -1,0 +1,6 @@
+build-stamp
+configure-stamp
+debian/files
+debian/live-swapfile.debhelper.log
+debian/live-swapfile.substvars
+debian/live-swapfile/

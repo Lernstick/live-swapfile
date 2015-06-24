@@ -1,0 +1,95 @@
+live-swapfile (0.8-2) lernstick-8; urgency=medium
+
+  * rebuild for lernstick 8
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Wed, 24 Jun 2015 19:52:42 +0200
+
+live-swapfile (0.8-1) unstable; urgency=low
+
+  * use vt switching only when plymouth is running
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Sat, 11 May 2013 10:36:38 +0200
+
+live-swapfile (0.7.9-1) unstable; urgency=low
+
+  * added vt switches in init script (needed in Debian wheezy)
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Fri, 08 Mar 2013 14:23:55 +0100
+
+live-swapfile (0.7.8-1) unstable; urgency=low
+
+  * show desktop file
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Fri, 06 Apr 2012 18:34:55 +0200
+
+live-swapfile (0.7.7-1) unstable; urgency=low
+
+  * use pause instead of msgbox for final success message
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Tue, 14 Jun 2011 10:33:42 +0200
+
+live-swapfile (0.7.6-1) unstable; urgency=low
+
+  * small bugfix
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Tue, 05 Apr 2011 14:08:36 +0200
+
+live-swapfile (0.7.5-1) unstable; urgency=low
+
+  * added option to rescan even when some partitions where found
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Fri, 11 Mar 2011 19:03:32 +0100
+
+live-swapfile (0.7.4-1) unstable; urgency=low
+
+  * do not fail when scan result is empty
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Fri, 11 Mar 2011 18:13:11 +0100
+
+live-swapfile (0.7.3-1) unstable; urgency=low
+
+  * new feature: rescan for usable partitions
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Fri, 11 Mar 2011 17:21:47 +0100
+
+live-swapfile (0.7.2-1) unstable; urgency=low
+
+  * mount fat partitions with umask=0
+
+ -- root <root@agora.imedias.ch>  Thu, 17 Feb 2011 15:33:57 +0100
+
+live-swapfile (0.7.1-1) unstable; urgency=low
+
+  * added some logging
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Mon, 14 Feb 2011 14:31:50 +0100
+
+live-swapfile (0.7-1) unstable; urgency=low
+
+  * complete rewrite
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Mon, 14 Feb 2011 08:44:39 +0100
+
+live-swapfile (0.6.1-1) unstable; urgency=low
+
+  * added plymouth support
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Thu, 10 Feb 2011 14:01:21 +0100
+
+live-swapfile (0.6-1) unstable; urgency=low
+
+  * do not show menu entry until everything is fixed
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Mon, 20 Dec 2010 17:25:18 +0100
+
+live-swapfile (0.5-2) unstable; urgency=low
+
+  * fixed debian rules file
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Mon, 20 Dec 2010 11:24:19 +0100
+
+live-swapfile (0.5-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Ronny Standtke <ronny.standtke@fhnw.ch>  Sun, 19 Dec 2010 20:00:40 +0100

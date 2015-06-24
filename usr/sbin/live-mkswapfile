@@ -1,0 +1,189 @@
+#!/bin/bash
+
+. /usr/lib/live-swapfile/functions.sh
+
+# the recommended size of the swap file
+RECOMMENDED=1024
+
+# the temporary file to use for dialog outputs
+TMP=/tmp/live_swapfile.tmp
+
+# gettext support
+. gettext.sh
+export TEXTDOMAIN=live-swapfile
+
+get_memory_info
+
+get_writable_partitions ()
+{
+	echo "" >> ${LOGFILE}
+	echo "getting list of writable partitions" >> ${LOGFILE}
+	unset PARTITIONS
+	for DEVICE in $(blkid -o device | grep -vE "/(loop|ram|dm-|fd)")
+	do
+		echo "checking device ${DEVICE}" >> ${LOGFILE}
+
+		# determine mount point of device
+		get_mount_point "${DEVICE}"
+		if [ -z "${MOUNTPOINT}" ]
+		then
+			# mounting device failed
+			echo " ERROR: could not mount ${DEVICE}" >> ${LOGFILE}
+			continue
+		fi
+		echo " ${DEVICE} is mounted on ${MOUNTPOINT}" >> ${LOGFILE}
+	
+		# check writability
+		if [ -w "${MOUNTPOINT}" ]
+		then
+			echo " ${MOUNTPOINT} is writable" >> ${LOGFILE}
+			# add device tag
+			PARTITIONS+=("${DEVICE}")
+
+			# add some info about device
+			get_device_info ${DEVICE}
+			PARTITIONS+=("$(eval_gettext "\${ID_MODEL} \${ID_FS_LABEL} \${ID_FS_TYPE} (\${SIZE} MB, \${FREE} MB free)")")
+		else
+			echo " ERROR: ${MOUNTPOINT} is not writable" >> ${LOGFILE}
+		fi
+
+		# cleanup
+		if [ -n "${UMOUNT}" ]
+		then
+			umount ${DEVICE}
+		fi
+	done
+
+	# error handling in case of no usable partitions
+	if [ -z "${PARTITIONS}" ]
+	then
+		dialog \
+			--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+			--title "$(gettext "Error")" \
+			--yes-label "$(gettext "Rescan")" \
+			--no-label "$(gettext "Cancel")" \
+			--yesno "$(gettext "No usable partitions for creating a swap file found.\n\nYou may now plug in removable devices like USB hard drives or USB flash drives and rescan for usable partitions.")" \
+			10 60
+		if [ $? -eq 0 ]
+		then
+			# yes, retry
+			get_writable_partitions
+		else
+			# no, exit
+			exit 1
+		fi
+	fi
+}
+
+get_writable_partitions
+
+# let the user select a partition
+while [ -z "${PARTITION}" ]
+do
+	dialog \
+		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+		--extra-button --extra-label "$(gettext "Rescan")" \
+		--menu "$(gettext "Please select a partition for a swap file or rescan for usable partitions:")" \
+		18 80 9 "${PARTITIONS[@]}" 2>"${TMP}"
+	case $? in
+		0)
+			# OK
+			PARTITION="$(<${TMP})"
+			rm ${TMP}
+			;;
+		3)
+			# Rescan
+			get_writable_partitions
+			;;
+		*)
+			# Cancel
+			exit 1
+			;;
+	esac
+done
+
+# mount selected partition
+get_mount_point ${PARTITION}
+if [ -z "${MOUNTPOINT}" ]
+then
+	# mounting failed
+	dialog \
+		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+		--title "$(gettext "Error")" \
+		--msgbox "$(eval_gettext "Mounting of \${PARTITION} failed.")" \
+		7 47
+	exit 1
+fi
+
+# ask user for the swap file size
+get_device_info ${DEVICE}
+MAX=$((${FREE} - 100))
+if [ "${MAX}" -lt "${RECOMMENDED}" ]
+then
+	RECOMMENDED="${MAX}"
+fi
+dialog \
+	--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+	--inputbox "$(eval_gettext "Size of swap file (in MB) on\n\${ID_MODEL} \${ID_FS_LABEL} \${ID_FS_TYPE} (\${SIZE} MB, \${FREE} MB free)")" \
+	10 62 ${RECOMMENDED} 2>"${TMP}"
+SIZE="$(<${TMP})"
+rm ${TMP}
+if [ -z ${SIZE} ]
+then
+	# the user cancelled the selection
+	exit 1
+fi
+
+# create swap file
+SWAP_FILE="${MOUNTPOINT}/live.swp"
+(
+LC_ALL=C dd if=/dev/zero of=${SWAP_FILE} bs=1M count=${SIZE} 2>&1 | while read LINE
+do
+        echo ${LINE} | grep -q "records out$"
+        if [ $? -eq 0 ]
+        then
+                echo "$((${LINE%+*}*100/${SIZE}))" | dialog \
+			--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+			--title "$(gettext "Please wait")" \
+			--gauge "$(eval_gettext "Creating \${SIZE} MB swap file...")" 6 45
+        fi
+done
+)&
+sleep 1
+DD_PID=$(pidof dd)
+while kill -USR1 ${DD_PID} 2>/dev/null
+do
+        sleep 1
+done
+
+if ! mkswap "${SWAP_FILE}" >/dev/null 2>&1
+then
+	dialog \
+		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+		--title "$(gettext "Error")" \
+		--msgbox "$(gettext "Could not create swap file!")" \
+		7 47
+	exit 1
+fi
+
+if ! swapon "${SWAP_FILE}" >/dev/null 2>&1
+then
+	dialog \
+		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+		--title "$(gettext "Error")" \
+		--msgbox "$(gettext "Could not activate swap file!")" \
+		7 47
+	exit 1
+fi
+
+get_memory_info
+
+### comment for translators: this is the height of the final information dialog
+HEIGHT=$(gettext "9")
+### comment for translators: this is the width of the final information dialog
+WIDTH=$(gettext "45")
+dialog \
+	--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+	--title "$(gettext "Information")" \
+	--nocancel --pause "$(gettext "The swap file was successfully created.")" \
+	${HEIGHT} ${WIDTH} 10

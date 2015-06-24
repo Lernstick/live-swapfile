@@ -1,0 +1,87 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:             live-swapfile
+# Required-Start:       $local_fs console-setup dbus
+# Required-Stop:        $local_fs
+# Default-Start:	1 2 3 4 5
+# Default-Stop:		0 6
+# X-Start-Before:    	kdm gdm
+# Description:          Runs the live-swapfile services
+# Short-Description:    Runs the live-swapfile services
+# X-Interactive:	true
+### END INIT INFO
+
+grep -qs swapfile=auto /proc/cmdline || exit 0
+
+case "${1}" in
+	start)
+		# the minimum amount of megabytes needed
+		MINIMUM=800
+
+		# get locale info
+		if [ -f /etc/default/locale ]
+		then
+			. /etc/default/locale
+			export LC_ALL=${LANG}
+		fi
+
+		# gettext support
+		. gettext.sh
+		export TEXTDOMAIN=live-swapfile
+
+		# source some functions
+		. /usr/lib/live-swapfile/functions.sh
+		>${LOGFILE}
+
+		# search and activate all live swap files
+		live-swapfile-on
+
+		# check, if there is now enough memory available
+		get_memory_info
+		TOTAL_MB="$(expr ${MEM_TOTAL_MB} + ${SWP_TOTAL_MB})"
+		if [ "${TOTAL_MB}" -ge "${MINIMUM}" ]
+		then
+			# there is enough memory available
+			exit 0
+		fi
+
+		# we need more swap space
+		if plymouth --ping
+		then
+			plymouth pause-progress
+			plymouth hide-splash
+			# switch to virtual terminal 7 (where this script is actually running)
+			chvt 7
+		fi
+
+		### comment for translators: this is the height of the initial warning dialog
+		HEIGHT=$(gettext "10")
+		### comment for translators: this is the width of the initial warning dialog
+		WIDTH=$(gettext "47")
+
+		dialog \
+			--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+			--title "$(gettext "Warning")" \
+			--msgbox "$(gettext "Your system has not much memory available.\nYou should create a swap file.\nOtherwise your system might just freeze or crash if you start large applications.")" \
+			${HEIGHT} ${WIDTH}
+
+		live-mkswapfile
+		if plymouth --ping
+		then
+			# switch back to standard terminal
+			chvt 1
+			plymouth show-splash
+			plymouth unpause-progress
+		fi
+		;;
+
+	stop|force-reload|restart)
+
+		;;
+
+	*)
+		echo "Usage: ${0} {start|stop|restart|force-reload}"
+		exit 1
+		;;
+esac

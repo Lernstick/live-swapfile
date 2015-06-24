@@ -1,0 +1,11 @@
+Source: live-swapfile
+Section: admin
+Priority: optional
+Maintainer: Ronny Standtke <ronny.standtke@fhnw.ch>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.8.3
+
+Package: live-swapfile
+Architecture: all
+Depends: ${misc:Depends}, bash, dialog, ntfs-3g
+Description: Creation and automatic activation of swap files

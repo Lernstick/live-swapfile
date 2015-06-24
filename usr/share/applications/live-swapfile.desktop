@@ -1,0 +1,8 @@
+[Desktop Entry]
+Exec=sudo /usr/sbin/live-mkswapfile
+Categories=X-lernstick;
+Name=Create swap file
+Name[de]=Auslagerungsdatei erstellen
+Icon=partitionmanager.png
+Type=Application
+Terminal=true

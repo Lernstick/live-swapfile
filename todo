@@ -1,0 +1,4 @@
+- warning if swapfile was created or activated on removable device
+- kdialog
+- option to mount partitions so that the user can not access it (pruefungsumgebung)
+	- must be evaluated in both live-mkswapfile and live-swapfile-on!!!

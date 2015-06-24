@@ -1,0 +1,18 @@
+Initialisierung
+---------------
+mkdir de
+xgettext -L Shell --add-comments=## live-initramfs
+vi messages.po #header richtig füllen
+cp messages.po de/live-initramfs.po
+vi de/live-initramfs.po # erste Übersetzung
+msgfmt -o de/live-initramfs.mo de/live-initramfs.po
+cp de/live-initramfs.mo /usr/share/locale/de/LC_MESSAGES/de/
+
+Update:
+-------
+xgettext -L Shell --add-comments=## live-initramfs
+msgmerge -U de/live-initramfs.po messages.po
+vi de/live-initramfs.po # Übersetzung aktualisieren
+msgfmt -o de/live-initramfs.mo de/live-initramfs.po
+cp de/live-initramfs.mo /usr/share/locale/de/LC_MESSAGES/de/
+
