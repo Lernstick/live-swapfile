@@ -1,0 +1,60 @@
+#!/bin/sh -
+grep -qs swapfile=auto /proc/cmdline || exit 0
+
+# the minimum amount of megabytes needed
+MINIMUM=800
+
+# get locale info
+if [ -f /etc/default/locale ]
+then
+	. /etc/default/locale
+	export LC_ALL=${LANG}
+fi
+
+# gettext support
+. gettext.sh
+export TEXTDOMAIN=live-swapfile
+
+# source some functions
+. /usr/lib/live-swapfile/functions.sh
+>${LOGFILE}
+
+# search and activate all live swap files
+live-swapfile-on
+
+# check, if there is now enough memory available
+get_memory_info
+TOTAL_MB="$(expr ${MEM_TOTAL_MB} + ${SWP_TOTAL_MB})"
+if [ "${TOTAL_MB}" -ge "${MINIMUM}" ]
+then
+	# there is enough memory available
+	exit 0
+fi
+
+# we need more swap space
+if plymouth --ping
+then
+	plymouth pause-progress
+	# switch to virtual terminal (where this script is actually running)
+	TTY=$(/usr/bin/tty)
+	chvt ${TTY##/dev/tty}
+fi
+
+### comment for translators: this is the height of the initial warning dialog
+HEIGHT=$(gettext "10")
+### comment for translators: this is the width of the initial warning dialog
+WIDTH=$(gettext "47")
+
+dialog \
+	--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+	--title "$(gettext "Warning")" \
+	--msgbox "$(gettext "Your system has not much memory available.\nYou should create a swap file.\nOtherwise your system might just freeze or crash if you start large applications.")" \
+	${HEIGHT} ${WIDTH}
+
+live-mkswapfile
+if plymouth --ping
+then
+	# switch back to standard terminal
+	chvt 7
+	plymouth unpause-progress
+fi

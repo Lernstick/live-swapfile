@@ -1,3 +1,9 @@
+live-swapfile (0.9) lernstick-8; urgency=medium
+
+  * rebuild for systemd
+
+ -- Mark Bryars <mbryars@google.com>  Wed, 16 Jun 2016 12:16:12 +0100
+
 live-swapfile (0.8-2) lernstick-8; urgency=medium
 
   * rebuild for lernstick 8

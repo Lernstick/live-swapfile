@@ -35,7 +35,7 @@ install: build
 	dh_clean -k
 	dh_installdirs
 
-	cp -a etc usr $(DESTDIR)
+	cp -a lib usr $(DESTDIR)
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -56,7 +56,9 @@ binary-arch: build install
 #	dh_installpam
 #	dh_installmime
 #	dh_python
-#	dh_installinit
+#	dh_systemd_enable
+	dh_installinit
+#	dh_systemd_start
 #	dh_installcron
 #	dh_installinfo
 	dh_installman

@@ -1,0 +1,15 @@
+[Unit]
+Description=Activate Live Swap
+After=getty@tty2.service
+Before=gdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/lib/systemd/lernstick-live-swapfile
+StandardInput=tty
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+
+[Install]
+WantedBy=default.target
