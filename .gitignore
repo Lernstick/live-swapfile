@@ -1,6 +1,9 @@
 build-stamp
 configure-stamp
 debian/files
-debian/live-swapfile.debhelper.log
-debian/live-swapfile.substvars
 debian/live-swapfile/
+debian/live-swapfile.debhelper.log
+debian/live-swapfile.postinst.debhelper
+debian/live-swapfile.postrm.debhelper
+debian/live-swapfile.prerm.debhelper
+debian/live-swapfile.substvars
