@@ -2,7 +2,7 @@
 grep -qs swapfile=auto /proc/cmdline || exit 0
 
 # the minimum amount of megabytes needed
-MINIMUM=800
+MINIMUM=1500
 
 # get locale info
 if [ -f /etc/default/locale ]
