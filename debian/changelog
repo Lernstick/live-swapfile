@@ -1,3 +1,9 @@
+live-swapfile (0.12) lernstick-8; urgency=medium
+
+  * [d99803] enlarged the minimum RAM value from 800 MB to 1500 MB (tested in VirtualBox with KDE)
+
+ -- Ronny Standtke <ronny.standtke@gmx.net>  Sun, 27 Nov 2016 18:10:05 +0100
+
 live-swapfile (0.11) lernstick-8; urgency=medium
 
   * [62bffc] added French translation
