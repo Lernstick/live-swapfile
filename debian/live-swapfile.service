@@ -6,6 +6,7 @@ Before=gdm.service
 [Service]
 Type=oneshot
 ExecStart=/lib/systemd/lernstick-live-swapfile
+RemainAfterExit=yes
 StandardInput=tty
 TTYPath=/dev/tty2
 TTYReset=yes
