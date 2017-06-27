@@ -14,11 +14,15 @@ export TEXTDOMAIN=live-swapfile
 
 get_memory_info
 
-get_writable_partitions ()
+get_writable_partition ()
 {
+	declare -A CANDIDATE_KEYS=( ["00"]="fixed_ssd" ["01"]="fixed_hdd" ["10"]="removable_ssd" ["11"]="removable_hdd" )
+	declare -A CANDIDATE_FREE=( ["fixed_ssd"]="0" ["fixed_hdd"]="0" ["removable_ssd"]="0" ["removable_hdd"]="0" )
+	declare -A CANDIDATE_PARTITION
+
 	echo "" >> ${LOGFILE}
 	echo "getting list of writable partitions" >> ${LOGFILE}
-	unset PARTITIONS
+	unset PARTITION
 	for DEVICE in $(blkid -o device | grep -vE "/(loop|ram|dm-|fd)")
 	do
 		echo "checking device ${DEVICE}" >> ${LOGFILE}
@@ -32,17 +36,21 @@ get_writable_partitions ()
 			continue
 		fi
 		echo " ${DEVICE} is mounted on ${MOUNTPOINT}" >> ${LOGFILE}
-	
+
 		# check writability
 		if [ -w "${MOUNTPOINT}" ]
 		then
 			echo " ${MOUNTPOINT} is writable" >> ${LOGFILE}
-			# add device tag
-			PARTITIONS+=("${DEVICE}")
-
 			# add some info about device
 			get_device_info ${DEVICE}
-			PARTITIONS+=("$(eval_gettext "\${ID_MODEL} \${ID_FS_LABEL} \${ID_FS_TYPE} (\${SIZE} MB, \${FREE} MB free)")")
+
+			KEY="${CANDIDATE_KEYS["${IS_REMOVABLE}${IS_ROTATIONAL}"]}"
+
+			if [ "${FREE}" -gt "${CANDIDATE_FREE["$KEY"]}" ]; then
+				echo " Updating ${KEY} with ${DEVICE} (${FREE} free)"
+				CANDIDATE_FREE["$KEY"]="${FREE}"
+				CANDIDATE_PARTITION["$KEY"]="${DEVICE}"
+			fi
 		else
 			echo " ERROR: ${MOUNTPOINT} is not writable" >> ${LOGFILE}
 		fi
@@ -54,8 +62,26 @@ get_writable_partitions ()
 		fi
 	done
 
+	# Go through candidates in preferred order and select the first with at
+	# least $RECOMMENDED free space.
+	unset PARTITION
+	for key in ${CANDIDATE_KEYS[@]}; do
+		if [ -z "$PARTITION" \
+		     -a -n "${CANDIDATE_PARTITION["$key"]}" \
+		     -a "${CANDIDATE_FREE["$key"]}" -gt "$RECOMMENDED" ]
+		then
+			PARTITION="${CANDIDATE_PARTITION["$key"]}"
+		fi
+	done
+
+	echo " Selected partition ${PARTITION}"
+}
+
+select_swap_partition() {
+	get_writable_partition
+
 	# error handling in case of no usable partitions
-	if [ -z "${PARTITIONS}" ]
+	if [ -z "${PARTITION}" ]
 	then
 		dialog \
 			--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
@@ -67,7 +93,7 @@ get_writable_partitions ()
 		if [ $? -eq 0 ]
 		then
 			# yes, retry
-			get_writable_partitions
+			select_swap_partition
 		else
 			# no, exit
 			exit 1
@@ -75,37 +101,40 @@ get_writable_partitions ()
 	fi
 }
 
-get_writable_partitions
+select_swap_partition
 
-# let the user select a partition
-while [ -z "${PARTITION}" ]
-do
+if [ -z "${PARTITION}" ]; then
+	# No swap partition
+	exit 1
+fi
+
+# Ask the user if we should proceed.
+dialog \
+	--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
+	--title "$(gettext "Create swap on ${PARTITION}?")" \
+	--yes-label "$(gettext "Yes")" \
+	--no-label "$(gettext "Skip")" \
+	--yesno "$(gettext "Available memory is low.\n\nSetup swap space? (recommended).")" \
+	10 60
+if [ $? -ne 0 ]
+then
+	# no, exit
+	exit 1
+fi
+
+# warn if the selected PARTITION is a removable device
+get_device_info ${PARTITION}
+if [ "$IS_REMOVABLE" = "1" ]; then
 	dialog \
 		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
-		--extra-button --extra-label "$(gettext "Rescan")" \
-		--menu "$(gettext "Please select a partition for a swap file or rescan for usable partitions:")" \
-		18 80 9 "${PARTITIONS[@]}" 2>"${TMP}"
-	case $? in
-		0)
-			# OK
-			PARTITION="$(<${TMP})"
-			rm ${TMP}
-			;;
-		3)
-			# Rescan
-			get_writable_partitions
-			;;
-		*)
-			# Cancel
-			exit 1
-			;;
-	esac
-done
+		--title "$(gettext "${PARTITION} is removable")" \
+		--msgbox "$(gettext "Selected device ${PARTITION} is removable.\n\nPlease do not remove this device until the system is shut down.")" \
+		10 60
+fi
 
 # mount selected partition
 get_mount_point ${PARTITION}
-if [ -z "${MOUNTPOINT}" ]
-then
+if [ -z "${MOUNTPOINT}" ]; then
 	# mounting failed
 	dialog \
 		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
@@ -115,75 +144,50 @@ then
 	exit 1
 fi
 
-# ask user for the swap file size
-get_device_info ${DEVICE}
-MAX=$((${FREE} - 100))
-if [ "${MAX}" -lt "${RECOMMENDED}" ]
-then
-	RECOMMENDED="${MAX}"
-fi
-dialog \
-	--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
-	--inputbox "$(eval_gettext "Size of swap file (in MB) on\n\${ID_MODEL} \${ID_FS_LABEL} \${ID_FS_TYPE} (\${SIZE} MB, \${FREE} MB free)")" \
-	10 62 ${RECOMMENDED} 2>"${TMP}"
-SIZE="$(<${TMP})"
-rm ${TMP}
-if [ -z ${SIZE} ]
-then
-	# the user cancelled the selection
-	exit 1
-fi
 
-# create swap file
-SWAP_FILE="${MOUNTPOINT}/live.swp"
-(
-LC_ALL=C dd if=/dev/zero of=${SWAP_FILE} bs=1M count=${SIZE} 2>&1 | while read LINE
-do
-        echo ${LINE} | grep -q "records out$"
-        if [ $? -eq 0 ]
-        then
-                echo "$((${LINE%+*}*100/${SIZE}))" | dialog \
-			--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
-			--title "$(gettext "Please wait")" \
-			--gauge "$(eval_gettext "Creating \${SIZE} MB swap file...")" 6 45
-        fi
-done
-)&
-sleep 1
-DD_PID=$(pidof dd)
-while kill -USR1 ${DD_PID} 2>/dev/null
-do
-        sleep 1
-done
+NAME=swapspace
+DAEMON="/usr/sbin/$NAME"
+PIDFILE="/var/run/$NAME.pid"
+CONFIG="/etc/$NAME.conf"
+PIDOPT="--pidfile $PIDFILE"
+DAEMON_ARGS="-d -p -c ${CONFIG}"
+STDOPTS="--quiet $PIDOPT"
+SWAPPATH="${MOUNTPOINT}/live.swapspace"
 
-if ! mkswap "${SWAP_FILE}" >/dev/null 2>&1
-then
+# Create swap directory
+mkdir -p "$SWAPPATH"
+if [ ! -d "$SWAPPATH" ]; then
+	# failed to create directory
 	dialog \
 		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
 		--title "$(gettext "Error")" \
-		--msgbox "$(gettext "Could not create swap file!")" \
+		--msgbox "$(eval_gettext "Could not create directory \${SWAPPATH}.")" \
 		7 47
 	exit 1
 fi
 
-if ! swapon "${SWAP_FILE}" >/dev/null 2>&1
-then
+RUNNING_PID=$(pidof $DAEMON)
+if [ -n "$RUNNING_PID" ]; then
+	kill $RUNNING_PID
+	sleep 5
+	kill -9 $RUNNING_PID
+fi
+
+# create swapspace config
+cat > ${CONFIG} <<EOF
+swappath="${SWAPPATH}"
+EOF
+
+# start swapspace daemon
+start-stop-daemon --start --oknodo --exec $DAEMON $STDOPTS -- $DAEMON_ARGS
+if [ $? -ne 0 ]; then
+	# Failed to start swapspace daemon
 	dialog \
 		--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
 		--title "$(gettext "Error")" \
-		--msgbox "$(gettext "Could not activate swap file!")" \
+		--msgbox "$(eval_gettext "Failed to start swapspace daemon.")" \
 		7 47
 	exit 1
 fi
 
 get_memory_info
-
-### comment for translators: this is the height of the final information dialog
-HEIGHT=$(gettext "9")
-### comment for translators: this is the width of the final information dialog
-WIDTH=$(gettext "45")
-dialog \
-	--backtitle "$(eval_gettext "RAM: \${MEM_TOTAL_MB} MB, Swap: \${SWP_TOTAL_MB} MB")" \
-	--title "$(gettext "Information")" \
-	--nocancel --pause "$(gettext "The swap file was successfully created.")" \
-	${HEIGHT} ${WIDTH} 10

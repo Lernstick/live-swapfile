@@ -4,12 +4,15 @@ get_device_info ()
 {
 	DEVICE="${1}"
 	PROPERTIES="$(udevadm info --name=${DEVICE} --query=property)"
+	DEVPATH=""
 	ID_MODEL=""
 	ID_FS_LABEL=""
 	ID_FS_TYPE=""
+	eval $(echo "${PROPERTIES}" | grep DEVPATH=)
 	eval $(echo "${PROPERTIES}" | grep ID_MODEL=)
 	eval $(echo "${PROPERTIES}" | grep ID_FS_LABEL=)
 	eval $(echo "${PROPERTIES}" | grep ID_FS_TYPE=)
+	eval $(lsblk -P -o ROTA,RM ${DEVICE} | sed -e 's@ROTA=@IS_ROTATIONAL=@;s@RM=@IS_REMOVABLE=@')
 	eval $(df | grep "^${DEVICE} "  | awk '{ print "SIZE="$2; print "FREE="$4 }')
 	if [ -n "${SIZE}" ]
 	then
